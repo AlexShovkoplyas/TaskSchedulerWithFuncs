@@ -5,8 +5,8 @@ using System.Text;
 
 namespace Api.Models
 {
-    public class WebPingTask : BaseTask
+    public class SavePageTask : BaseTask
     {
-        public string Url { get; set; }
+        public string Url2 { get; set; }
     }
 }

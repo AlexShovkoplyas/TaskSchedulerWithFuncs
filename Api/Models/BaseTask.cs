@@ -1,17 +1,20 @@
-﻿using System;
+﻿using Microsoft.WindowsAzure.Storage.Table;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Api.Models
 {
-    public class BaseTask
+    public class BaseTask : TableEntity
     {
-        public string Id { get; set; }
+        public BaseTask(): base("TaskPartitionKey", Guid.NewGuid().ToString())
+        {
+
+        }
 
         public string Cron { get; set; }
 
-        public TaskType TaskType { get; set; }
-
-        public object TaskOptions { get; set; }
+        public string TaskType { get; set; }
     }
 }
