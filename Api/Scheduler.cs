@@ -11,53 +11,29 @@ using Api.Models;
 using Microsoft.WindowsAzure.Storage.Table;
 using System.Linq;
 using System.Collections.Generic;
+using Microsoft.Azure.ServiceBus;
+using System.Text;
 
 namespace Api
 {
-    public static class Function2
+    public static class Scheduler
     {
-        [FunctionName("CreateTask_WebPing")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Tasks/WebPing")] HttpRequest req,
-            [Table("Tasks2", Connection = "TableStorage")] CloudTable taskTable,
-            [CosmosDB("Tasks", "Items",
-                ConnectionStringSetting = "CosmosDBConnection",
-                SqlQuery = "select * from Tasks order by")]
-                IEnumerable<ToDoItem> toDoItems,
+
+        [FunctionName("Schedule_WebPing")]
+        public static async Task Run(
+            [QueueTrigger("scheduled-tasks", Connection = "TableStorage")] string myQueueItem,
+            [Table("Tasks2", "TaskPartitionKey", "{queueTrigger}", Connection = "TableStorage")] WebPingTask task,
+            [ServiceBus("WebPing", Connection = "ServiceBusConnection")] IAsyncCollector<Message> serviceBus,
             ILogger log)
         {
-            log.LogInformation("C# HTTP trigger function processed a request.");
+            task.SetNextOccurance();
 
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var task = JsonConvert.DeserializeObject<WebPingTask>(requestBody);
+            var message = new Message();
+            message.MessageId = task.RowKey;
+            message.UserProperties.Add("RowKey", task.RowKey);
+            message.ScheduledEnqueueTimeUtc = task.NextOccurance.ToUniversalTime();
 
-            var operation = TableOperation.Insert(task);
-            var c = await taskTable.ExecuteAsync(operation);
-
-            return new OkObjectResult("Added.");
-        }
-
-        [FunctionName("GetAllTasks")]
-        public async static Task<IActionResult> Run25(
-            [TimerTrigger("0 */1 * * * *", RunOnStartup = true)] TimerInfo timerInfo,
-            [Table("Tasks2", Connection = "TableStorage")] CloudTable taskTable,
-            ILogger log)
-        {
-            log.LogInformation("C# HTTP trigger function processed a request.");
-
-            var segment1 = await GetTasks<WebPingTask>(taskTable, "WebPing");
-            var segment2 = await GetTasks<SavePageTask>(taskTable, "SavePage");
-
-            return new OkObjectResult(segment1.Cast<BaseTask>().Concat(segment2).Cast<BaseTask>());
-        }        
-
-        private async static Task<TableQuerySegment<T>> GetTasks<T>(CloudTable taskTable, string taskType) where T : BaseTask, new()
-        {
-            var query = new TableQuery<T>()
-                .Where(TableQuery.GenerateFilterCondition("TaskType", QueryComparisons.Equal, taskType));
-            var segment = await taskTable.ExecuteQuerySegmentedAsync(query, null);
-
-            return segment;
+            await serviceBus.AddAsync(message);
         }
     }
 }

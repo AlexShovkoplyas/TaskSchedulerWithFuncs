@@ -10,50 +10,33 @@ using Newtonsoft.Json;
 using Api.Models;
 using Microsoft.WindowsAzure.Storage.Table;
 using System.Linq;
+using Microsoft.Azure.ServiceBus;
+using System.Text;
 
 namespace Api
 {
     public static class Function1
     {
-        [FunctionName("CreateTask_WebPing")]
-        public static async Task<IActionResult> Run(
+        [FunctionName("CreateTask_WebPing2")]
+        [return: Queue("scheduled-tasks", Connection = "TableStorage")]
+        public static async Task<string> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Tasks/WebPing")] HttpRequest req,
-            [Table("Tasks2", Connection = "TableStorage")] CloudTable taskTable,
-            [CosmosDB(
-                databaseName: "ToDoItems",
-                collectionName: "Items",
-                ConnectionStringSetting = "CosmosDBConnection")] dynamic taskScheduled,
+            [Table("Tasks3", Connection = "TableStorage")] CloudTable taskTable,
+            
             ILogger log)
         {
             log.LogInformation("C# HTTP trigger function processed a request.");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var task = JsonConvert.DeserializeObject<WebPingTask>(requestBody);
+            task.SetNextOccurance();
 
             var operation = TableOperation.Insert(task);
-            var c = await taskTable.ExecuteAsync(operation);
+            await taskTable.ExecuteAsync(operation);
 
-            //TODO:
-            taskScheduled = new { Description = queueMessage, id = Guid.NewGuid() };
+            //await queue.AddAsync(task.RowKey);
 
-            return new OkObjectResult("Added.");
-        }
-
-        [FunctionName("CreateTask_PageSave")]
-        public static async Task<IActionResult> Run2(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Tasks/PageSave")] HttpRequest req,
-            [Table("Tasks2", Connection = "TableStorage")] CloudTable taskTable,
-            ILogger log)
-        {
-            log.LogInformation("C# HTTP trigger function processed a request.");
-
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var task = JsonConvert.DeserializeObject<SavePageTask>(requestBody);
-
-            var operation = TableOperation.Insert(task);
-            var c = await taskTable.ExecuteAsync(operation);
-
-            return new OkObjectResult("Added.");
+            return task.RowKey;
         }
 
         [FunctionName("GetAllTasks")]
