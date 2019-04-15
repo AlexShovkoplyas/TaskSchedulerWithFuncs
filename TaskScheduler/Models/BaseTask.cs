@@ -1,17 +1,14 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 using NCrontab;
-using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using static TaskScheduler.StorageNames;
 
-namespace Api.Models
+namespace TaskScheduler.Models
 {
     public class BaseTask : TableEntity
     {
-        public BaseTask() : base("TaskPartitionKey", Guid.NewGuid().ToString())
+        public BaseTask() : base(PARTITIONKEY_DEFAULT, Guid.NewGuid().ToString())
         {
-
         }
 
         public string Cron { get; set; }
